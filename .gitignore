@@ -27,3 +27,6 @@
 *.exe
 *.out
 *.app
+
+## Real credentials
+credentials_real.h
