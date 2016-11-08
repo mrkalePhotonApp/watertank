@@ -73,7 +73,7 @@ STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 //------------------------------------------------------------------------
 // Water tank sensing and publishing to clouds (ThinkSpeak, Blynk)
 //-------------------------------------------------------------------------
-#define SKETCH "WATERTANK 1.1.0"
+#define SKETCH "WATERTANK 1.2.1"
 #include "credentials.h"
 
 const unsigned int TIMEOUT_WATCHDOG = 10000;  // Watchdog timeout in milliseconds
@@ -145,7 +145,6 @@ String BLYNK_LABEL = String("Chalupa -- ");
 // Measured values
 int rssiValue;
 int lightValue, rainValue, waterValue;
-unsigned char lightStatus, rainStatus, waterStatus;
 float lightTrend, rainTrend, waterTrend;
 
 // Backup variables (long terms statistics)
@@ -153,6 +152,7 @@ retained int bootCount, bootTimeLast, bootRunPeriod;
 retained int lightValueMin = 4096, lightValueMax;
 retained int rainValueMin = 4096, rainValueMax;
 retained int waterValueMin = 100, waterValueMax;
+retained unsigned char lightStatus, rainStatus, waterStatus;
 
 // Statistical smoothing and exponential filtering
 const float FACTOR_RSSI  = 0.1;    // Smoothing factor for RSSI
@@ -166,8 +166,8 @@ ExponentialFilter efWater = ExponentialFilter(FACTOR_WATER);
 SmoothSensorData smooth;
 
 // Light level
-const int LIGHT_VALUE_DARK     = 0;
-const int LIGHT_VALUE_TWILIGHT = 15;
+const int LIGHT_VALUE_DARK     = 8;
+const int LIGHT_VALUE_TWILIGHT = 32;
 const int LIGHT_VALUE_CLOUDY   = 512;
 const int LIGHT_VALUE_CLEAR    = 1024;
 const int LIGHT_VALUE_MARGIN   = 2;        // Difference in value for status hysteresis
@@ -237,8 +237,7 @@ void measureRssi() {
   static unsigned long tsMeasure;
   if (millis() - tsMeasure >= PERIOD_MEASURE_RSSI || tsMeasure == 0) {
     tsMeasure = millis();
-    while(smooth.registerData(abs(WiFi.RSSI())));
-    rssiValue = efRssi.getValue(-1 * smooth.getMedian());
+    rssiValue = efRssi.getValue(WiFi.RSSI());
     }
 }
 
@@ -246,7 +245,7 @@ void measureLight() {
     static unsigned long tsMeasure, tsMeasureOld;
     static unsigned int cntMeasure;
     static int lightValueOld;
-    static unsigned char lightStatusOld;
+    static unsigned char lightStatusOld = lightStatus;
     if (millis() - tsMeasure >= PERIOD_MEASURE_LIGHT || tsMeasure == 0) {
         tsMeasure = millis();
         // Value
@@ -310,7 +309,7 @@ void measureRain() {
     static unsigned long tsMeasure, tsMeasureOld;
     static unsigned int cntMeasure;
     static int rainValueOld;
-    static unsigned char rainStatusOld;
+    static unsigned char rainStatusOld = rainStatus;
     if (millis() - tsMeasure >= PERIOD_MEASURE_RAIN || tsMeasure == 0) {
         tsMeasure = millis();
         // Value
@@ -373,7 +372,7 @@ void measureWater() {
     static unsigned long tsMeasure, tsMeasureOld;
     static unsigned int cntMeasure;
     static int waterValueOld;
-    static unsigned char waterStatusOld;
+    static unsigned char waterStatusOld = waterStatus;
     if (millis() - tsMeasure >= PERIOD_MEASURE_WATER || tsMeasure == 0) {
         tsMeasure = millis();
         // Value
