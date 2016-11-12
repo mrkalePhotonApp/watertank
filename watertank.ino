@@ -401,8 +401,8 @@ void measureWater() {
                 if (waterTrend < -1 * WATER_TREND_MARGIN) waterStatus = WATER_STATUS_PUMPING;
                 if (waterStatusOld != waterStatus) {
 #ifdef BLYNK_NOTIFY_WATER
-                    String txtStatus;
                     // Push notification
+                    String txtStatus;
                     switch (waterStatus) {
                         case WATER_STATUS_STABLE:
                             txtStatus = String("stabilized");
@@ -424,7 +424,6 @@ void measureWater() {
                             ledWaterPump.off();
                             break;
                     }
-                    Blynk.notify(BLYNK_LABEL + String("Water tank has been ") + txtStatus);
 #endif
                     waterStatusOld = waterStatus;
                 }
