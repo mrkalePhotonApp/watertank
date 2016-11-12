@@ -23,7 +23,7 @@ Application for observing water tank, rain intensity, and ambient light intensit
 
 - Publishing to cloud services:
   - *ThingSpeak* for graphing and further analyzing of smoothed and filtered values.
-  - *Blynk* for publishing smoothed and filtered values, trends, statuses, and minimal and maximal values in mobile application as well as for push notifications at status changes.
+  - *Blynk* for publishing smoothed and filtered values, trends, statuses, and minimal and maximal values in mobile application as well as for push notifications and led signaling at status changes.
 
 - The application utilizes a separate include **credentials** file with credentials to cloud services.
   - The credential file contains just placeholder for credentials.

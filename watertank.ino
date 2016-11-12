@@ -35,7 +35,7 @@
       and filtered values.
     - Blynk for publishing smoothed and filtered values, trends, statuses,
       and minimal and maximal values in mobile application as well as for
-      push notifications at status changes.
+      push notifications and led signaling at status changes.
   - The application utilizes a separate include credentials file
     with credentials to cloud services.
     - The credential file contains just placeholder for credentials.
@@ -52,7 +52,7 @@
 // #define PHOTON_PUBLISH_DEBUG      // This publishes debug events to the particle cloud
 // #define PHOTON_PUBLISH_VALUE      // This publishes regular events to the particle cloud
 // #define BLYNK_DEBUG               // Optional, this enables lots of prints
-#define BLYNK_NOTIFY_LIGHT
+// #define BLYNK_NOTIFY_LIGHT
 #define BLYNK_NOTIFY_RAIN
 #define BLYNK_NOTIFY_WATER
 
@@ -73,7 +73,7 @@ STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 //------------------------------------------------------------------------
 // Water tank sensing and publishing to clouds (ThinkSpeak, Blynk)
 //-------------------------------------------------------------------------
-#define SKETCH "WATERTANK 1.1.0"
+#define SKETCH "WATERTANK 1.3.0"
 #include "credentials.h"
 
 const unsigned int TIMEOUT_WATCHDOG = 10000;  // Watchdog timeout in milliseconds
@@ -137,7 +137,9 @@ const char* BLYNK_TOKEN = CREDENTIALS_BLYNK_TOKEN;
 #define VPIN_WATER_TREND V12
 #define VPIN_WATER_MIN   V13
 #define VPIN_WATER_MAX   V14
-//
+#define VPIN_WATER_PUMP  V15
+// Blynk variables
+WidgetLED ledWaterPump(VPIN_WATER_PUMP);
 #if defined(BLYNK_NOTIFY_LIGHT) || defined(BLYNK_NOTIFY_RAIN) || defined(BLYNK_NOTIFY_WATER)
 String BLYNK_LABEL = String("Chalupa -- ");
 #endif
@@ -145,7 +147,6 @@ String BLYNK_LABEL = String("Chalupa -- ");
 // Measured values
 int rssiValue;
 int lightValue, rainValue, waterValue;
-unsigned char lightStatus, rainStatus, waterStatus;
 float lightTrend, rainTrend, waterTrend;
 
 // Backup variables (long terms statistics)
@@ -153,12 +154,13 @@ retained int bootCount, bootTimeLast, bootRunPeriod;
 retained int lightValueMin = 4096, lightValueMax;
 retained int rainValueMin = 4096, rainValueMax;
 retained int waterValueMin = 100, waterValueMax;
+retained unsigned char lightStatus, rainStatus, waterStatus;
 
 // Statistical smoothing and exponential filtering
 const float FACTOR_RSSI  = 0.1;    // Smoothing factor for RSSI
 const float FACTOR_LIGHT = 0.2;    // Smoothing factor for light level
 const float FACTOR_RAIN  = 0.5;    // Smoothing factor for rain level
-const float FACTOR_WATER = 0.2;    // Smoothing factor for water level
+const float FACTOR_WATER = 0.8;    // Smoothing factor for water level
 ExponentialFilter efRssi  = ExponentialFilter(FACTOR_RSSI);
 ExponentialFilter efLight = ExponentialFilter(FACTOR_LIGHT);
 ExponentialFilter efRain  = ExponentialFilter(FACTOR_RAIN);
@@ -166,8 +168,8 @@ ExponentialFilter efWater = ExponentialFilter(FACTOR_WATER);
 SmoothSensorData smooth;
 
 // Light level
-const int LIGHT_VALUE_DARK     = 0;
-const int LIGHT_VALUE_TWILIGHT = 15;
+const int LIGHT_VALUE_DARK     = 8;
+const int LIGHT_VALUE_TWILIGHT = 32;
 const int LIGHT_VALUE_CLOUDY   = 512;
 const int LIGHT_VALUE_CLEAR    = 1024;
 const int LIGHT_VALUE_MARGIN   = 2;        // Difference in value for status hysteresis
@@ -237,8 +239,7 @@ void measureRssi() {
   static unsigned long tsMeasure;
   if (millis() - tsMeasure >= PERIOD_MEASURE_RSSI || tsMeasure == 0) {
     tsMeasure = millis();
-    while(smooth.registerData(abs(WiFi.RSSI())));
-    rssiValue = efRssi.getValue(-1 * smooth.getMedian());
+    rssiValue = efRssi.getValue(WiFi.RSSI());
     }
 }
 
@@ -246,7 +247,7 @@ void measureLight() {
     static unsigned long tsMeasure, tsMeasureOld;
     static unsigned int cntMeasure;
     static int lightValueOld;
-    static unsigned char lightStatusOld;
+    static unsigned char lightStatusOld = lightStatus;
     if (millis() - tsMeasure >= PERIOD_MEASURE_LIGHT || tsMeasure == 0) {
         tsMeasure = millis();
         // Value
@@ -310,7 +311,7 @@ void measureRain() {
     static unsigned long tsMeasure, tsMeasureOld;
     static unsigned int cntMeasure;
     static int rainValueOld;
-    static unsigned char rainStatusOld;
+    static unsigned char rainStatusOld = rainStatus;
     if (millis() - tsMeasure >= PERIOD_MEASURE_RAIN || tsMeasure == 0) {
         tsMeasure = millis();
         // Value
@@ -373,7 +374,7 @@ void measureWater() {
     static unsigned long tsMeasure, tsMeasureOld;
     static unsigned int cntMeasure;
     static int waterValueOld;
-    static unsigned char waterStatusOld;
+    static unsigned char waterStatusOld = waterStatus;
     if (millis() - tsMeasure >= PERIOD_MEASURE_WATER || tsMeasure == 0) {
         tsMeasure = millis();
         // Value
@@ -385,6 +386,7 @@ void measureWater() {
             waterValueOld = waterValue;
         // Calculate statistics
         } else if (tsMeasure > tsMeasureOld) {
+            if (waterValueMin < 0)          waterValueMin = waterValueMax;
             if (waterValueMin > waterValue) waterValueMin = waterValue;
             if (waterValueMax < waterValue) waterValueMax = waterValue;
             // Calculate trend
@@ -400,6 +402,7 @@ void measureWater() {
                 if (waterStatusOld != waterStatus) {
 #ifdef BLYNK_NOTIFY_WATER
                     String txtStatus;
+                    // Push notification
                     switch (waterStatus) {
                         case WATER_STATUS_STABLE:
                             txtStatus = String("stabilized");
@@ -409,6 +412,16 @@ void measureWater() {
                             break;
                         case WATER_STATUS_PUMPING:
                             txtStatus = String("pumping out");
+                            break;
+                    }
+                    Blynk.notify(BLYNK_LABEL + String("Water tank has been ") + txtStatus);
+                    // Signal LED
+                    switch (waterStatus) {
+                        case WATER_STATUS_PUMPING:
+                            ledWaterPump.on();
+                            break;
+                        default:
+                            ledWaterPump.off();
                             break;
                     }
                     Blynk.notify(BLYNK_LABEL + String("Water tank has been ") + txtStatus);
