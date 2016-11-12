@@ -73,7 +73,7 @@ STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 //------------------------------------------------------------------------
 // Water tank sensing and publishing to clouds (ThinkSpeak, Blynk)
 //-------------------------------------------------------------------------
-#define SKETCH "WATERTANK 1.3.0"
+#define SKETCH "WATERTANK 1.3.1"
 #include "credentials.h"
 
 const unsigned int TIMEOUT_WATCHDOG = 10000;  // Watchdog timeout in milliseconds
@@ -159,7 +159,7 @@ retained unsigned char lightStatus, rainStatus, waterStatus;
 // Statistical smoothing and exponential filtering
 const float FACTOR_RSSI  = 0.1;    // Smoothing factor for RSSI
 const float FACTOR_LIGHT = 0.2;    // Smoothing factor for light level
-const float FACTOR_RAIN  = 0.5;    // Smoothing factor for rain level
+const float FACTOR_RAIN  = 0.2;    // Smoothing factor for rain level
 const float FACTOR_WATER = 0.8;    // Smoothing factor for water level
 ExponentialFilter efRssi  = ExponentialFilter(FACTOR_RSSI);
 ExponentialFilter efLight = ExponentialFilter(FACTOR_LIGHT);
@@ -181,15 +181,17 @@ const unsigned char LIGHT_STATUS_CLEAR    = 4;
 const unsigned char LIGHT_STATUS_SUNNY    = 5;
 
 // Rain level
-const int RAIN_VALUE_DRY    = 63;
-const int RAIN_VALUE_DEW    = 127;
+const int RAIN_VALUE_DRY    = 64;
+const int RAIN_VALUE_DEW    = 128;
 const int RAIN_VALUE_RAIN   = 512;
+const int RAIN_VALUE_SHOWER = 1024;
 const int RAIN_VALUE_MARGIN = 4;         // Difference in value for status hysteresis
 //
 const unsigned char RAIN_STATUS_DRY    = 1;
 const unsigned char RAIN_STATUS_DEW    = 2;
 const unsigned char RAIN_STATUS_RAIN   = 3;
 const unsigned char RAIN_STATUS_SHOWER = 4;
+const unsigned char RAIN_STATUS_STORM  = 5;
 
 // Water level
 const int SONAR_DISTANCE_MAX = 95;          // Maximal valid measured distance (to tank bottom)
@@ -339,8 +341,10 @@ void measureRain() {
                     rainStatus = RAIN_STATUS_DEW;
                 } else if (rainValue <= RAIN_VALUE_RAIN) {
                     rainStatus = RAIN_STATUS_RAIN;
-                } else {
+                } else if (rainValue <= RAIN_VALUE_SHOWER) {
                     rainStatus = RAIN_STATUS_SHOWER;
+                } else {
+                    rainStatus = RAIN_STATUS_STORM;
                 }
                 // Notify at status change
                 if (rainStatusOld != rainStatus && rainDiff >= RAIN_VALUE_MARGIN) {
@@ -358,6 +362,9 @@ void measureRain() {
                           break;
                         case RAIN_STATUS_SHOWER:
                           txtStatus = String("Heavy rain");
+                          break;
+                        case RAIN_STATUS_STORM:
+                          txtStatus = String("Rain storm");
                           break;
                     }
                     Blynk.notify(BLYNK_LABEL + txtStatus);
