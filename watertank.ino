@@ -73,7 +73,7 @@ STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 //------------------------------------------------------------------------
 // Water tank sensing and publishing to clouds (ThinkSpeak, Blynk)
 //-------------------------------------------------------------------------
-#define SKETCH "WATERTANK 1.3.1"
+#define SKETCH "WATERTANK 1.3.2"
 #include "credentials.h"
 
 const unsigned int TIMEOUT_WATCHDOG = 10000;  // Watchdog timeout in milliseconds
@@ -141,7 +141,11 @@ const char* BLYNK_TOKEN = CREDENTIALS_BLYNK_TOKEN;
 // Blynk variables
 WidgetLED ledWaterPump(VPIN_WATER_PUMP);
 #if defined(BLYNK_NOTIFY_LIGHT) || defined(BLYNK_NOTIFY_RAIN) || defined(BLYNK_NOTIFY_WATER)
-String BLYNK_LABEL = String("Chalupa -- ");
+String BLYNK_LABEL_GLUE = String(" -- ");
+String BLYNK_LABEL_PREFIX = String("Chalupa");
+String BLYNK_LABEL_LIGHT = String("Light");
+String BLYNK_LABEL_RAIN = String("Rain");
+String BLYNK_LABEL_WATER = String("Watertank");
 #endif
 
 // Measured values
@@ -185,6 +189,7 @@ const int RAIN_VALUE_DRY    = 64;
 const int RAIN_VALUE_DEW    = 128;
 const int RAIN_VALUE_RAIN   = 512;
 const int RAIN_VALUE_SHOWER = 1024;
+const int RAIN_VALUE_STORM  = 2048;
 const int RAIN_VALUE_MARGIN = 4;         // Difference in value for status hysteresis
 //
 const unsigned char RAIN_STATUS_DRY    = 1;
@@ -192,6 +197,7 @@ const unsigned char RAIN_STATUS_DEW    = 2;
 const unsigned char RAIN_STATUS_RAIN   = 3;
 const unsigned char RAIN_STATUS_SHOWER = 4;
 const unsigned char RAIN_STATUS_STORM  = 5;
+const unsigned char RAIN_STATUS_POUR   = 6;
 
 // Water level
 const int SONAR_DISTANCE_MAX = 95;          // Maximal valid measured distance (to tank bottom)
@@ -300,7 +306,7 @@ void measureLight() {
                             txtStatus = String("Sunny weather");
                             break;
                     }
-                    Blynk.notify(BLYNK_LABEL + txtStatus);
+                    Blynk.notify(BLYNK_LABEL_PREFIX + BLYNK_LABEL_GLUE + BLYNK_LABEL_LIGHT + BLYNK_LABEL_GLUE + txtStatus);
 #endif
                     lightStatusOld = lightStatus;
                 }
@@ -343,8 +349,10 @@ void measureRain() {
                     rainStatus = RAIN_STATUS_RAIN;
                 } else if (rainValue <= RAIN_VALUE_SHOWER) {
                     rainStatus = RAIN_STATUS_SHOWER;
-                } else {
+                } else if (rainValue <= RAIN_VALUE_STORM) {
                     rainStatus = RAIN_STATUS_STORM;
+                } else {
+                    rainStatus = RAIN_STATUS_POUR;
                 }
                 // Notify at status change
                 if (rainStatusOld != rainStatus && rainDiff >= RAIN_VALUE_MARGIN) {
@@ -352,22 +360,25 @@ void measureRain() {
                     String txtStatus;
                     switch (rainStatus) {
                         case RAIN_STATUS_DRY:
-                          txtStatus = String("Dry whether");
+                          txtStatus = String("None");
                           break;
                         case RAIN_STATUS_DEW:
-                          txtStatus = String("Moisture or dew");
+                          txtStatus = String("Dew");
                           break;
                         case RAIN_STATUS_RAIN:
-                          txtStatus = String("Still rain");
+                          txtStatus = String("Still");
                           break;
                         case RAIN_STATUS_SHOWER:
-                          txtStatus = String("Heavy rain");
+                          txtStatus = String("Heavy");
                           break;
                         case RAIN_STATUS_STORM:
-                          txtStatus = String("Rain storm");
+                          txtStatus = String("Storm");
+                          break;
+                        case RAIN_STATUS_POUR:
+                          txtStatus = String("Downpour");
                           break;
                     }
-                    Blynk.notify(BLYNK_LABEL + txtStatus);
+                    Blynk.notify(BLYNK_LABEL_PREFIX + BLYNK_LABEL_GLUE + BLYNK_LABEL_RAIN + BLYNK_LABEL_GLUE + txtStatus);
 #endif
                     rainStatusOld = rainStatus;
                 }
@@ -412,16 +423,16 @@ void measureWater() {
                     String txtStatus;
                     switch (waterStatus) {
                         case WATER_STATUS_STABLE:
-                            txtStatus = String("stabilized");
+                            txtStatus = String("Stabile");
                             break;
                         case WATER_STATUS_FILLING:
-                            txtStatus = String("filled");
+                            txtStatus = String("Filling");
                             break;
                         case WATER_STATUS_PUMPING:
-                            txtStatus = String("pumping out");
+                            txtStatus = String("Pumping");
                             break;
                     }
-                    Blynk.notify(BLYNK_LABEL + String("Water tank has been ") + txtStatus);
+                    Blynk.notify(BLYNK_LABEL_PREFIX + BLYNK_LABEL_GLUE + BLYNK_LABEL_WATER + BLYNK_LABEL_GLUE + txtStatus);
                     // Signal LED
                     switch (waterStatus) {
                         case WATER_STATUS_PUMPING:
