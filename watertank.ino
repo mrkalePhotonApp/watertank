@@ -7,15 +7,16 @@
   intensity as well as boot count and RSSI.
   - The application reads from various sensors and publishes gained values
     in order to observe the cottage garden.
-  - Observation sensors:
-    - Water level in water tank by ultrasonic sersor HC-SR04 in centimeters
-      within range 2 ~ 95 cm with resolution 1 cm.
-    - Rain intensity by analog resistive sensor board YL-83 in bits within
-      range 0 ~ 4095 with 12-bit resolution.
+  - Physical observation:
     - Ambient light intensity by analog sensor TEMT6000 in bits within
       range 0 ~ 4095 with 12-bit resolution.
+    - Rain intensity by analog resistive sensor board YL-83 in bits within
+      range 0 ~ 4095 with 12-bit resolution.
+    - Water level in water tank by ultrasonic sersor HC-SR04 in centimeters
+      within range 2 ~ 95 cm with resolution 1 cm.
     - For each sensor the trend is calculated in units change per minute.
-    - For each sensor the status is determined at trend calculation.
+    - For each sensor the status is determined according to the current
+      value or trend calculation.
     - For each sensor the long term minimal and maximal value in units is
       calculated.
   - System observation:
@@ -33,9 +34,7 @@
   - Publishing to cloud services:
     - ThingSpeak for graphing and further analyzing of smoothed
       and filtered values.
-    - Blynk for publishing smoothed and filtered values, trends, statuses,
-      and minimal and maximal values in mobile application as well as for
-      push notifications and led signaling at status changes.
+    - Blynk for mobile application observation and control.
   - The application utilizes a separate include credentials file
     with credentials to cloud services.
     - The credential file contains just placeholder for credentials.
@@ -73,7 +72,7 @@ STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 //------------------------------------------------------------------------
 // Water tank sensing and publishing to clouds (ThinkSpeak, Blynk)
 //-------------------------------------------------------------------------
-#define SKETCH "WATERTANK 1.3.2"
+#define SKETCH "WATERTANK 1.4.0"
 #include "credentials.h"
 
 const unsigned int TIMEOUT_WATCHDOG = 10000;  // Watchdog timeout in milliseconds
@@ -127,19 +126,25 @@ const char* BLYNK_TOKEN = CREDENTIALS_BLYNK_TOKEN;
 #define VPIN_LIGHT_TREND V4
 #define VPIN_LIGHT_MIN   V5
 #define VPIN_LIGHT_MAX   V6
+#define VPIN_LIGHT_PERC  V17
+#define VPIN_LIGHT_RESET V18
 //
 #define VPIN_RAIN_VALUE  V7
 #define VPIN_RAIN_TREND  V8
 #define VPIN_RAIN_MIN    V9
 #define VPIN_RAIN_MAX    V10
+#define VPIN_RAIN_PERC   V19
 //
 #define VPIN_WATER_VALUE V11
 #define VPIN_WATER_TREND V12
 #define VPIN_WATER_MIN   V13
 #define VPIN_WATER_MAX   V14
 #define VPIN_WATER_PUMP  V15
+#define VPIN_WATER_FILL  V16
+
 // Blynk variables
 WidgetLED ledWaterPump(VPIN_WATER_PUMP);
+WidgetLED ledWaterFill(VPIN_WATER_FILL);
 #if defined(BLYNK_NOTIFY_LIGHT) || defined(BLYNK_NOTIFY_RAIN) || defined(BLYNK_NOTIFY_WATER)
 String BLYNK_LABEL_GLUE = String(" -- ");
 String BLYNK_LABEL_PREFIX = String("Chalupa");
@@ -149,8 +154,8 @@ String BLYNK_LABEL_WATER = String("Watertank");
 #endif
 
 // Measured values
-int rssiValue;
-int lightValue, rainValue, waterValue;
+int   rssiValue;
+int   lightValue, rainValue, waterValue;
 float lightTrend, rainTrend, waterTrend;
 
 // Backup variables (long terms statistics)
@@ -387,7 +392,6 @@ void measureRain() {
     }
 }
 
-
 void measureWater() {
     static unsigned long tsMeasure, tsMeasureOld;
     static unsigned int cntMeasure;
@@ -433,14 +437,16 @@ void measureWater() {
                             break;
                     }
                     Blynk.notify(BLYNK_LABEL_PREFIX + BLYNK_LABEL_GLUE + BLYNK_LABEL_WATER + BLYNK_LABEL_GLUE + txtStatus);
-                    // Signal LED
-                    switch (waterStatus) {
-                        case WATER_STATUS_PUMPING:
-                            ledWaterPump.on();
-                            break;
-                        default:
-                            ledWaterPump.off();
-                            break;
+                    // LED signaling 
+                    if (waterStatus == WATER_STATUS_FILLING) {
+                        ledWaterFill.on();
+                    } else {
+                        ledWaterFill.off();
+                    }
+                    if (waterStatus == WATER_STATUS_PUMPING) {
+                        ledWaterPump.on();
+                    } else {
+                        ledWaterPump.off();
                     }
 #endif
                     waterStatusOld = waterStatus;
@@ -555,6 +561,26 @@ BLYNK_READ(VPIN_LIGHT_MAX)
 }
 #endif
 
+#ifdef VPIN_LIGHT_PERC
+BLYNK_READ(VPIN_LIGHT_PERC)
+{
+    int lightPerc = 0;
+    if (lightValueMax > lightValueMin) {
+        lightPerc = map(lightValue, lightValueMin, lightValueMax, 0, 100);
+    }
+    Blynk.virtualWrite(VPIN_LIGHT_PERC, lightPerc);
+}
+#endif
+
+#ifdef VPIN_LIGHT_RESET
+BLYNK_WRITE(VPIN_LIGHT_RESET)
+{
+    if (param.asInt() == HIGH) {
+        lightValueMin = lightValueMax = lightValue;
+    }
+}
+#endif
+
 #ifdef VPIN_RAIN_VALUE
 BLYNK_READ(VPIN_RAIN_VALUE)
 {
@@ -580,6 +606,17 @@ BLYNK_READ(VPIN_RAIN_MIN)
 BLYNK_READ(VPIN_RAIN_MAX)
 {
     Blynk.virtualWrite(VPIN_RAIN_MAX, rainValueMax);
+}
+#endif
+
+#ifdef VPIN_RAIN_PERC
+BLYNK_READ(VPIN_RAIN_PERC)
+{
+    int rainPerc = 0;
+    if (rainValueMax > rainValueMin) {
+        rainPerc = map(rainValue, rainValueMin, rainValueMax, 0, 100);
+    }
+    Blynk.virtualWrite(VPIN_RAIN_PERC, rainPerc);
 }
 #endif
 
