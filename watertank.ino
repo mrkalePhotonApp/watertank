@@ -72,7 +72,7 @@ STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 //------------------------------------------------------------------------
 // Water tank sensing and publishing to clouds (ThinkSpeak, Blynk)
 //-------------------------------------------------------------------------
-#define SKETCH "WATERTANK 1.4.0"
+#define SKETCH "WATERTANK 1.5.0"
 #include "credentials.h"
 
 const unsigned int TIMEOUT_WATCHDOG = 10000;  // Watchdog timeout in milliseconds
@@ -164,6 +164,7 @@ retained int lightValueMin = 4096, lightValueMax;
 retained int rainValueMin = 4096, rainValueMax;
 retained int waterValueMin = 100, waterValueMax;
 retained unsigned char lightStatus, rainStatus, waterStatus;
+retained char bootFwVersion[9];
 
 // Statistical smoothing and exponential filtering
 const float FACTOR_RSSI  = 0.1;    // Smoothing factor for RSSI
@@ -220,7 +221,8 @@ void setup() {
     // Boot process
     if (bootCount++ > 0) bootRunPeriod = Time.now() - bootTimeLast;
     bootTimeLast = Time.now();
-    Particle.publish("Boot_Cnt_Run", String::format("%d/%d", bootCount, bootRunPeriod));
+    strcpy(bootFwVersion, System.version());
+    Particle.publish("Boot_Cnt_Run", String::format("%d/%d/%s", bootCount, bootRunPeriod, bootFwVersion));
 #ifdef PHOTON_PUBLISH_DEBUG
     Particle.publish("Sketch", String(SKETCH));
 #endif

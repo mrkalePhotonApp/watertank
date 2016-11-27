@@ -15,6 +15,8 @@ Application for observing water tank, rain intensity, and ambient light intensit
 
 - *System observation*:
   - Number of boots since recent power-up.
+  - Number of seconds since recent boot.
+  - Firmware version at recent boot.
   - RSSI wifi signal intensity.
 
 
