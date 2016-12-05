@@ -112,4 +112,4 @@ For Blynk cloud and composing a mobile application following aspects are provide
 
 - All measured values a provided to a mobile application only on demand with help related **Blynk methods and virtual pins**. Values are not pushed to the Blynk cloud, just a mobile application reads them at its time intervals.
 
-- The application switches on and off **Blynk LEDs** for aforementioned dynamic statuss, filling and pumping, for better and smarter indication in a mobile application.
+- The application switches on and off **Blynk LEDs** for aforementioned dynamic statuses, filling and pumping, for better and smarter indication in a mobile application.

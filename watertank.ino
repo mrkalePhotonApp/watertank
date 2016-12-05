@@ -51,7 +51,7 @@
 // #define PHOTON_PUBLISH_DEBUG      // This publishes debug events to the particle cloud
 // #define PHOTON_PUBLISH_VALUE      // This publishes regular events to the particle cloud
 // #define BLYNK_DEBUG               // Optional, this enables lots of prints
-// #define BLYNK_NOTIFY_LIGHT
+#define BLYNK_NOTIFY_LIGHT
 #define BLYNK_NOTIFY_RAIN
 #define BLYNK_NOTIFY_WATER
 
@@ -72,7 +72,7 @@ STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 //------------------------------------------------------------------------
 // Water tank sensing and publishing to clouds (ThinkSpeak, Blynk)
 //-------------------------------------------------------------------------
-#define SKETCH "WATERTANK 1.5.0"
+#define SKETCH "WATERTANK 1.6.0"
 #include "credentials.h"
 
 const unsigned int TIMEOUT_WATCHDOG = 10000;  // Watchdog timeout in milliseconds
@@ -160,11 +160,11 @@ float lightTrend, rainTrend, waterTrend;
 
 // Backup variables (long terms statistics)
 retained int bootCount, bootTimeLast, bootRunPeriod;
+retained char bootFwVersion[9];
 retained int lightValueMin = 4096, lightValueMax;
 retained int rainValueMin = 4096, rainValueMax;
 retained int waterValueMin = 100, waterValueMax;
 retained unsigned char lightStatus, rainStatus, waterStatus;
-retained char bootFwVersion[9];
 
 // Statistical smoothing and exponential filtering
 const float FACTOR_RSSI  = 0.1;    // Smoothing factor for RSSI
@@ -206,9 +206,9 @@ const unsigned char RAIN_STATUS_STORM  = 5;
 const unsigned char RAIN_STATUS_POUR   = 6;
 
 // Water level
-const int SONAR_DISTANCE_MAX = 95;          // Maximal valid measured distance (to tank bottom)
-const int WATER_TANK_EMPTY   = 89;          // Minimal water level (empty tank - to the bottom)
-const int WATER_TANK_FULL    = 3;           // Maximal water level (full tank - to the brink)
+const int   SONAR_DISTANCE_MAX = 95;        // Maximal valid measured distance (to tank bottom)
+const int   WATER_TANK_EMPTY   = 89;        // Minimal water level (empty tank - to the bottom)
+const int   WATER_TANK_FULL    = 3;         // Maximal water level (full tank - to the brink)
 const float WATER_TREND_MARGIN = 1.5;       // Difference in trend for status hysteresis
 //
 const unsigned char WATER_STATUS_STABLE  = 1; // No rain, no pumping
@@ -439,6 +439,7 @@ void measureWater() {
                             break;
                     }
                     Blynk.notify(BLYNK_LABEL_PREFIX + BLYNK_LABEL_GLUE + BLYNK_LABEL_WATER + BLYNK_LABEL_GLUE + txtStatus);
+#endif
                     // LED signaling 
                     if (waterStatus == WATER_STATUS_FILLING) {
                         ledWaterFill.on();
@@ -450,7 +451,6 @@ void measureWater() {
                     } else {
                         ledWaterPump.off();
                     }
-#endif
                     waterStatusOld = waterStatus;
                 }
             }
